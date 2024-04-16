@@ -1,6 +1,10 @@
 # image_classification
 
 ```
+# train
+cd image_classification
+bash run.sh
+
 
 streamlit run Homepage.py
 ```
