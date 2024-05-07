@@ -2,7 +2,7 @@ import torch
 import torchvision.datasets as dset
 import torchvision.transforms as transforms
 
-from utils import Cutout
+from image_classification.utils import Cutout
 
 
 def getDataloaders(data, config_of_data, splits=['train', 'val', 'test'],

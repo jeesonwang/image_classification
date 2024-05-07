@@ -6,7 +6,9 @@ import torch
 
 import numpy as np
 from colorama import Fore
-
+import streamlit as st
+import streamlit.components.v1 as components
+import ndraw
 
 def create_save_folder(save_path, force=False, ignore_patterns=[]):
     if os.path.exists(save_path):
@@ -153,3 +155,49 @@ class Cutout(object):
 
         return img
 ###############################################################
+
+class TrainCallback:
+    def __init__(self):
+
+        self.summary_line = None
+        self.process_text = None
+        self.process_bar = None
+        self.loss_line = None
+        self.acc_line = None
+        
+
+    def on_train_begin(self, epochs):
+        self.epochs = epochs
+
+        self.train_info = st.expander("训练信息")
+
+        st.subheader("训练进度")
+        self.process_text = st.text("0/{}".format(epochs))
+        self.process_bar = st.progress(0)
+        self.process_bar.progress(1 / self.epochs)
+        
+        st.header("训练汇总")
+        self.summary_line = st.area_chart()
+
+        st.subheader('loss曲线')
+        self.loss_line = st.line_chart()
+
+        st.subheader('accuracy曲线')
+        self.acc_line = st.line_chart()
+
+
+    def on_epoch_end(self, epoch, train_loss, train_acc, val_loss, val_acc):
+        self.loss_line.add_rows({'train_loss': [train_loss], 'val_loss': [val_loss]})
+        self.acc_line.add_rows({'train_acc': [train_acc], 'val_accuracy': [val_acc]})
+        self.process_bar.progress((epoch + 1) / self.epochs)
+        self.process_text.empty()
+        self.process_text.text("{}/{}".format(epoch + 1, self.epochs))
+
+
+    def on_batch_end(self, epoch, train_loss, train_acc):
+        self.summary_line.add_rows({'loss': [train_loss], 'accuracy': [train_acc]})
+    
+    def on_train_info(self, info: str):
+        with self.train_info:
+            st.write(info)
+    

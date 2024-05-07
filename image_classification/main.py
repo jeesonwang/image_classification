@@ -17,7 +17,7 @@ from importlib import import_module
 
 import config
 from dataloader import getDataloaders
-from utils import save_checkpoint, get_optimizer, create_save_folder
+from image_classification.utils import save_checkpoint, get_optimizer, create_save_folder
 from args import arg_parser, arch_resume_names
 
 try:
@@ -25,9 +25,10 @@ try:
 except BaseException:
     configure = None
 
+from image_classification.utils import TrainCallback
 
 def getModel(arch, **kargs):
-    m = import_module('models.' + arch)
+    m = import_module('image_classification.models.' + arch)
     model = m.createModel(**kargs)
     if arch.startswith('alexnet') or arch.startswith('vgg'):
         model.features = torch.nn.DataParallel(model.features)
@@ -37,13 +38,15 @@ def getModel(arch, **kargs):
     return model
 
 
-def main():
+def main(args, callbacks: TrainCallback):
     # parse arg and start experiment
-    global args
+    # global args
     best_err1 = 100.
     best_epoch = 0
+    callbacks.on_train_begin(epochs=args.epochs)
+    callbacks.on_train_info("开始训练：")
+    callbacks.on_train_info(str(args))
 
-    args = arg_parser.parse_args()
     args.config_of_data = config.datasets[args.data]
     args.num_classes = config.datasets[args.data]['num_classes']
     if configure is None:
@@ -85,6 +88,10 @@ def main():
         print("=> creating model '{}'".format(args.arch))
         model = getModel(**vars(args))
 
+    # 记录
+    callbacks.on_train_info("=> creating model '{}'".format(args.arch))
+
+
     cudnn.benchmark = True
 
     # define loss function (criterion) and pptimizer
@@ -96,9 +103,10 @@ def main():
     # set random seed
     torch.manual_seed(args.seed)
 
-    Trainer = import_module(args.trainer).Trainer
+    Trainer = import_module("image_classification.train").Trainer
     trainer = Trainer(model, criterion, optimizer, args)
 
+    callbacks.on_train_info("开始加载数据集....")
     # create dataloader
     if args.evaluate == 'train':
         train_loader, _, _ = getDataloaders(
@@ -118,7 +126,7 @@ def main():
     else:
         train_loader, val_loader, _ = getDataloaders(
             splits=('train', 'val'), **vars(args))
-
+    # train_loader = tra
     # check if the folder exists
     create_save_folder(args.save, args.force)
 
@@ -146,7 +154,7 @@ def main():
 
         # train for one epoch
         train_loss, train_err1, train_err5, lr = trainer.train(
-            train_loader, epoch)
+            train_loader, epoch, callbacks=callbacks)
 
         if args.tensorboard:
             log_value('lr', lr, epoch)
@@ -156,6 +164,8 @@ def main():
 
         # evaluate on validation set
         val_loss, val_err1, val_err5 = trainer.test(val_loader, epoch)
+
+        callbacks.on_train_info('Validation: Epoch: {:3d} val   loss {loss:.4f} Err@1 {top1:.4f} Err@5 {top5:.4f}'.format(epoch, loss=val_loss, top1=val_err1, top5=val_err5))
 
         if args.tensorboard:
             log_value('val_loss', val_loss, epoch)
@@ -169,6 +179,8 @@ def main():
                               train_err1, val_err1, train_err5, val_err5))
         with open(os.path.join(args.save, 'scores.tsv'), 'w') as f:
             print('\n'.join(scores), file=f)
+
+        callbacks.on_epoch_end(epoch=epoch, train_loss=train_loss, train_acc=train_err1, val_loss=val_loss, val_acc=val_err1)
 
         # remember best err@1 and save checkpoint
         is_best = val_err1 < best_err1
@@ -190,8 +202,11 @@ def main():
         }, is_best, args.save)
         if not is_best and epoch - best_epoch >= args.patience > 0:
             break
-    print('Best val_err1: {:.4f} at epoch {}'.format(best_err1, best_epoch))
+
+    callbacks.on_train_info('Best val_err1: {:.4f} at epoch {}'.format(best_err1, best_epoch))
+    # print('Best val_err1: {:.4f} at epoch {}'.format(best_err1, best_epoch))
 
 
 if __name__ == '__main__':
-    main()
+    args = arg_parser.parse_args()
+    main(args, callbacks=TrainCallback())
