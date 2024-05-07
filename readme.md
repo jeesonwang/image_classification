@@ -13,18 +13,18 @@ streamlit run Homepage.py
 
 ##### object detection
 
-![od_predict](images\od_predict.jpg)
+![od_predict](images/od_predict.jpg)
 
 ### Train interface
 
-![train_config](images\train_config.jpg)
+![train_config](images/train_config.jpg)
 
-![train_process](images\train_process.jpg)
+![train_process](images/train_process.jpg)
 
-![train_process_1](images\train_process_1.jpg)
+![train_process_1](images/train_process_1.jpg)
 
 ### Result display interface
 
-![od_results](images\od_results.jpg)
+![od_results](images/od_results.jpg)
 
-![od_results_1](images\od_results_1.jpg)
+![od_results_1](images/od_results_1.jpg)
