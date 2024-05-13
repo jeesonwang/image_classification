@@ -5,7 +5,7 @@ import os
 import tempfile
 from pathlib import Path
 import pathlib
-
+import time
 temp = pathlib.PosixPath
 pathlib.PosixPath = pathlib.WindowsPath
 
@@ -29,18 +29,21 @@ st.markdown('---')
 
 # 文件载入
 uploaded_file = st.file_uploader("Upload your image", type=["png", "jpg"])
+file_contents = None
+folder_path = None
+file_path = None
 if uploaded_file:
     # 创建临时文件
     temp_dir = tempfile.mkdtemp()
-    path = os.path.join(temp_dir, uploaded_file.name)
-    with open(path, "wb") as f:
+    file_path = os.path.join(temp_dir, uploaded_file.name)
+    with open(file_path, "wb") as f:
         f.write(uploaded_file.getvalue())
-file_contents = None
-if uploaded_file:        
     # 读取文件内容
     file_contents = Image.open(uploaded_file)
-    # 显示文件内容
     st.image(file_contents, width=500)
+
+if file_contents is None:
+    folder_path = st.text_input('Enter the folder path', 'yolov5/data/images')
 
 device = st.radio("device", ['cpu', 'cuda'], index=None)
 
@@ -76,21 +79,42 @@ if option.startswith('Resnet'):
                         st.write(round(row, 2))
 else:
     conf_thres = st.slider('Confidence threshold', 0.0, 1.0, 0.25)  # confidence threshold
-    if device is not None and file_contents is not None:
-        if st.button('Execute'):
-            with st.spinner('Running...'):
-                checkpoint_path = Path('yolov5\\runs\\train\\exp\\weights\\best.pt')
-                if device == 'cuda':
-                    device = "cuda:0"
-                
-                img, speed_info, save_info = run(weights=checkpoint_path, source=path, conf_thres=conf_thres, device=device, exist_ok=True)
-                st.info(speed_info)
-                if save_info:
-                    st.info(save_info)
+    if device is not None:
+        if file_path or folder_path:
+            if st.button('Execute'):
+                with st.spinner('Running...'):
+                    checkpoint_path = Path('yolov5\\runs\\train\\exp\\weights\\best.pt')
+                    if device == 'cuda':
+                        device = "0"
+                    
+                    if file_path is not None:
+                        path = file_path
+                    elif folder_path is not None:
+                        path = folder_path
+                    else:
+                        st.warning("🚨")
+                    
+                    imgs, speed_info, save_info = run(weights=checkpoint_path, source=path, conf_thres=conf_thres, device=device, exist_ok=True)
+                    st.info(speed_info)
+                    if save_info:
+                        st.info(save_info)
                 # st.image(img, width=500, channels="BGR")
-                col1, col2 = st.columns(2)
-                # 在每列中显示一张图片
-                with col1:
-                    st.image(file_contents, channels="BGR",width=600, caption="Original image")
-                with col2:
-                    st.image(img, channels="BGR", width=600, caption="Detected Image")
+                if file_path:
+                    col1, col2 = st.columns(2)
+                    # 在每列中显示一张图片
+                    with col1:
+                        st.image(file_contents, channels="BGR",width=600, caption="Original image")
+                    with col2:
+                        placeholder_image = st.empty()
+                        with placeholder_image:
+                            for img in imgs:
+                                st.image(img, channels="BGR", width=600, caption="Detected Images")
+                                time.sleep(1.5)
+                elif folder_path:
+                    st.info(f"There are a total of {len(imgs)} images in the folder.")
+                    placeholder_image = st.empty()
+                    while True:
+                        for img in imgs:
+                            with placeholder_image:
+                                st.image(img, channels="BGR", width=500, caption="Detected Images")
+                                time.sleep(1.75)
